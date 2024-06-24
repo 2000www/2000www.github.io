@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Compatible - Chat with Gemini Chatbot on poor device/internet.</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      direction: auto;
+    }
+    .hidden { display: none; }
+    .chat-box {
+      border: 1px solid #ccc;
+      padding: 10px;
+      max-width: 500px;
+      width: 100%;
+      margin: 20px auto;
+      height: 300px;
+      overflow-y: auto;
+    }
+    .message { margin: 10px 0; }
+    .user { color: #0066cc; }
+    .ai { color: #cc6600; }
+    input, textarea, button {
+      margin: 5px 0;
+      padding: 10px;
+      width: 100%;
+      max-width: 500px;
+      box-sizing: border-box;
+    }
+    textarea { resize: vertical; }
+    .markdown { white-space: pre-wrap; }
+    #contextMessage {
+      margin-top: 10px;
+      font-style: italic;
+      color: grey;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <div id="apiInput">
+    <input type="text" id="apiKey" placeholder="Enter your API key" />
+    <div>
+      <input type="checkbox" id="rememberApiKey" /> Remember API key
+    </div>
+    <a href="https://aistudio.google.com/app/apikey" target="_blank">Get your API key</a>
+  </div>
+  <div class="chat-box hidden" id="chatBox"></div>
+  <textarea class="hidden" id="prompt" placeholder="Enter your prompt" rows="2"></textarea>
+  <button class="hidden" id="submit">Submit</button>
+  <div id="contextMessage">Google uses prompts/responses to improve their products.</div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "@google/generative-ai": "https://esm.run/@google/generative-ai"
+      }
+    }
+  </script>
+  <script type="module">
+    import { GoogleGenerativeAI } from "@google/generative-ai";
+
+    const apiKeyInput = document.getElementById('apiKey');
+    const rememberApiKeyCheckbox = document.getElementById('rememberApiKey');
+    const promptInput = document.getElementById('prompt');
+    const chatBox = document.getElementById('chatBox');
+    const submitButton = document.getElementById('submit');
+    const contextMessage = document.getElementById('contextMessage');
+    let genAI, model;
+
+    if (localStorage.getItem('apiKey')) {
+      apiKeyInput.value = localStorage.getItem('apiKey');
+      rememberApiKeyCheckbox.checked = true;
+    }
+
+    apiKeyInput.addEventListener('keypress', async (event) => {
+      if (event.key === 'Enter') {
+        const apiKey = apiKeyInput.value.trim();
+        if (apiKey) {
+          try {
+            genAI = new GoogleGenerativeAI(apiKey);
+            model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            if (rememberApiKeyCheckbox.checked) {
+              localStorage.setItem('apiKey', apiKey);
+            } else {
+              localStorage.removeItem('apiKey');
+            }
+            document.getElementById('apiInput').classList.add('hidden');
+            promptInput.classList.remove('hidden');
+            chatBox.classList.remove('hidden');
+            submitButton.classList.remove('hidden');
+          } catch (error) {
+            alert(`Error initializing API: ${error.message}`);
+          }
+        }
+      }
+    });
+
+    promptInput.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        submitButton.click();
+      }
+    });
+
+    submitButton.addEventListener('click', async () => {
+      const prompt = promptInput.value.trim();
+      if (!prompt || !model) return;
+
+      clearMessages();
+      addMessage('user', prompt);
+      promptInput.value = '';
+
+      try {
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = await response.text();
+        addMessage('ai', text);
+        contextMessage.textContent = "Currently, Gemini doesn't remember any message you send.";
+      } catch (error) {
+        addMessage('ai', `Error: ${error.message}`);
+      }
+    });
+
+    function clearMessages() {
+      chatBox.innerHTML = '';
+    }
+
+    function addMessage(sender, text) {
+      const messageDiv = document.createElement('div');
+      messageDiv.classList.add('message', sender);
+
+      if (sender === 'ai') {
+        messageDiv.innerHTML = marked.parse(text);
+        messageDiv.classList.add('markdown');
+      } else {
+        messageDiv.textContent = text;
+      }
+
+      chatBox.appendChild(messageDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+  </script>
+</body>
+</html>
